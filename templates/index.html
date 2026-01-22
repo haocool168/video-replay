@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>视频回放系统 - Plyr版</title>
+<!-- 引入Plyr.js CSS -->
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<style>
+body {
+    margin: 0;
+    background: #000;
+    color: #fff;
+    font-family: sans-serif;
+    overflow: hidden;
+}
+
+/* Plyr播放器容器 */
+#player-container {
+    width: 100vw;
+    height: calc(100vh - 180px);
+    position: relative;
+    background: #000;
+    overflow: hidden;
+}
+
+/* 视频容器 */
+#video-container {
+    width: 100%;
+    height: calc(100% - 60px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 缩放相关样式 */
+#video-container.zoomable {
+    cursor: zoom-in;
+}
+
+#video-container.zooming {
+    cursor: move;
+}
+
+/* 缩放模式显示激活状态 */
+#zoom-display.active {
+    background: #4caf50 !important;
+}
+
+/* 视频元素样式 - 重要：移除限制尺寸的样式 */
+#player {
+    /* 移除 max-width 和 max-height 限制 */
+    transition: transform 0.2s ease-out;
+    transform-origin: 0 0;
+}
+
+/* 宽屏模式 */
+#video-container.widescreen #player {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: fill !important;
+}
+
+/* 旋转样式 - 应用到视频容器 */
+#video-container.rotated {
+    transition: transform 0.3s;
+}
+
+#video-container.rotated-90 {
+    transform: rotate(90deg);
+}
+
+#video-container.rotated-180 {
+    transform: rotate(180deg);
+}
+
+#video-container.rotated-270 {
+    transform: rotate(270deg);
+}
+
+/* 自定义Plyr主题 - 隐藏原生控制条 */
+.plyr {
+    height: 100%;
+    --plyr-color-main: #00a8ff;
+    --plyr-control-radius: 8px;
+}
+
+/* 隐藏Plyr的原生控制条 */
+.plyr__controls {
+    display: none !important;
+}
+
+/* 自定义控制条 - 不旋转 */
+#custom-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    box-sizing: border-box;
+    z-index: 5;
+}
+
+/* 进度条样式 */
+.progress-container {
+    flex: 1;
+    height: 20px;
+    margin: 0 20px;
+    position: relative;
+    cursor: pointer;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-filled {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #00a8ff;
+    border-radius: 3px;
+    width: 0%;
+}
+
+.progress-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    background: #00a8ff;
+    border-radius: 50%;
+    display: none;
+}
+
+.progress-container:hover .progress-thumb {
+    display: block;
+}
+
+/* 时间显示 */
+.time-display {
+    color: white;
+    font-size: 14px;
+    min-width: 100px;
+    text-align: center;
+}
+
+/* 控制按钮组 */
+.control-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.control-buttons button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+    min-width: 60px;
+}
+
+.control-buttons button:hover {
+    background: #555;
+}
+
+.control-buttons button.active {
+    background: #00a8ff;
+    color: #000;
+}
+
+/* 宽屏模式按钮特殊样式 */
+#widescreenBtn.active {
+    background: #ff9800 !important;
+    color: #000 !important;
+}
+
+/* 缩放模式按钮特殊样式 */
+#zoomBtn.active {
+    background: #4caf50 !important;
+    color: #000 !important;
+}
+
+#timelineContainer {
+    position: fixed;
+    bottom: 60px;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background: #111;
+    border-top: 1px solid #333;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+#timeline { position: relative; height: 60px; }
+.hourMark {
+    position: absolute;
+    top: 0;
+    height: 60px;
+    border-left: 1px solid #555;
+    text-align: left;
+    font-size: 12px;
+    color: #ccc;
+    padding-left: 2px;
+}
+.timeblock {
+    position: absolute;
+    top: 0;
+    height: 60px;
+    background: red;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.timeblock:hover {
+    opacity: 1;
+}
+#playhead {
+    position: absolute;
+    top:0;
+    width:2px;
+    height:60px;
+    background:cyan;
+}
+#playheadLabel {
+    position:absolute;
+    top:-20px;
+    left:0;
+    padding:2px 4px;
+    background:rgba(0,0,0,0.7);
+    color:#fff;
+    font-size:12px;
+    border-radius:3px;
+    pointer-events:none;
+}
+
+/* 浮动操作面板 */
+#controlPanel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 10px;
+    padding: 10px;
+    transition: opacity 0.3s;
+    z-index: 10;
+}
+#controlPanel:hover { background: rgba(0,0,0,0.8); }
+
+#controlPanel button {
+    margin: 3px;
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+#controlPanel button:hover { background: #444; }
+#controlPanel button.active {
+    background: #00a8ff;
+    color: #000;
+}
+
+#controlPanel #widescreenBtnPanel.active {
+    background: #ff9800 !important;
+    color: #000 !important;
+}
+
+#controlPanel #zoomBtnPanel.active {
+    background: #4caf50 !important;
+    color: #000 !important;
+}
+
+#togglePanel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 30px;
+    cursor: pointer;
+    display: none;
+    z-index: 10;
+}
+
+/* 设备列表样式 */
+#devices li {
+    padding: 5px 10px;
+    margin: 2px 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    cursor: pointer;
+}
+#devices li:hover {
+    background: rgba(255,255,255,0.2);
+}
+#devices li.active {
+    background: #00a8ff;
+    color: #000;
+}
+
+/* 旋转角度显示 */
+#rotation-display {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    z-index: 5;
+}
+
+/* 宽屏模式显示 */
+#widescreen-display {
+    position: absolute;
+    top: 10px;
+    left: 120px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    z-index: 5;
+}
+
+/* 缩放模式显示 */
+#zoom-display {
+    position: absolute;
+    top: 10px;
+    left: 240px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    z-index: 5;
+}
+
+/* 倍速控制组 */
+.speed-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.speed-controls button {
+    flex: 1;
+    min-width: 40px;
+}
+
+/* 播放按钮 */
+#playPauseBtn {
+    background: #00a8ff !important;
+    color: #000 !important;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+/* 重置缩放按钮 */
+#resetZoomBtn {
+    background: #f44336 !important;
+    color: white !important;
+}
+</style>
+</head>
+<body>
+
+<!-- 播放器容器 -->
+<div id="player-container">
+    <!-- 视频容器 -->
+    <div id="video-container">
+        <video id="player" playsinline>
+            <!-- 视频源将通过JS动态设置 -->
+        </video>
+    </div>
+    
+    <!-- 自定义控制条 -->
+    <div id="custom-controls">
+        <button id="playPauseBtn">▶</button>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-filled" id="progressFilled"></div>
+                <div class="progress-thumb" id="progressThumb"></div>
+            </div>
+        </div>
+        
+        <div class="time-display">
+            <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+        </div>
+        
+        <div class="control-buttons">
+            <button id="back5" title="后退5秒">⏪ 5s</button>
+            <button id="back10" title="后退10秒">⏪ 10s</button>
+            <button id="rotateBtn" title="旋转90°">🔄</button>
+            <button id="widescreenBtn" title="宽屏模式">📺</button>
+            <button id="zoomBtn" title="缩放模式">🔍</button>
+            <button id="resetZoomBtn" title="重置缩放">⟲</button>
+            <div class="speed-controls">
+                <button data-speed="1" class="active">X1</button>
+                <button data-speed="2">X2</button>
+                <button data-speed="4">X4</button>
+            </div>
+            <button id="fullscreenBtn" title="全屏">⛶</button>
+        </div>
+    </div>
+    
+    <!-- 状态显示 -->
+    <div id="rotation-display">旋转: 0°</div>
+    <div id="widescreen-display">宽屏: 关闭</div>
+    <div id="zoom-display">缩放: 关闭 (100%)</div>
+</div>
+
+<!-- 浮动操作面板 -->
+<div id="controlPanel">
+    <div style="margin-bottom:6px;">选择设备:</div>
+    <ul id="devices" style="list-style:none; margin:0; padding:0;"></ul>
+    <div style="margin-top:8px;">
+        日期:<input type="date" id="datePicker">
+    </div>
+    <div style="margin-top:8px;">
+        <button id="rotateBtnPanel">旋转90°</button>
+        <button id="widescreenBtnPanel">宽屏模式</button>
+        <button id="zoomBtnPanel">缩放模式</button>
+        <button id="resetZoomBtnPanel">重置缩放</button>
+        <button id="back5Panel">⏪ -5s</button>
+        <button id="back10Panel">⏪ -10s</button>
+        <div class="speed-controls">
+            <button data-speed="1" class="active">X1</button>
+            <button data-speed="2">X2</button>
+            <button data-speed="4">X4</button>
+        </div>
+        <button id="downloadBtn">下载</button>
+    </div>
+</div>
+<button id="togglePanel">菜单</button>
+
+<div id="timelineContainer">
+    <div id="timeline"></div>
+    <div id="playhead"></div>
+    <div id="playheadLabel">00:00:00</div>
+</div>
+
+<!-- 引入Plyr.js -->
+<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+<script>
+let currentDevice = null;
+let timelineScale = 80;
+let videosData = [];
+let currentVideoIndex = 0;
+let isDragging = false;
+let rotationDeg = 0;
+let isWidescreen = false;
+let isZoomMode = false;
+let zoomScale = 1;
+let zoomOffsetX = 0;
+let zoomOffsetY = 0;
+let isPanning = false;
+let startPanX = 0;
+let startPanY = 0;
+let startOffsetX = 0;
+let startOffsetY = 0;
+let player;
+let isSeeking = false;
+
+const controlPanel = document.getElementById("controlPanel");
+const togglePanel = document.getElementById("togglePanel");
+const timelineContainer = document.getElementById("timelineContainer");
+const timeline = document.getElementById("timeline");
+const playhead = document.getElementById("playhead");
+const playheadLabel = document.getElementById("playheadLabel");
+const downloadBtn = document.getElementById("downloadBtn");
+const rotationDisplay = document.getElementById("rotation-display");
+const widescreenDisplay = document.getElementById("widescreen-display");
+const zoomDisplay = document.getElementById("zoom-display");
+const videoContainer = document.getElementById("video-container");
+const videoElement = document.getElementById("player");
+
+// 自定义控制条元素
+const playPauseBtn = document.getElementById("playPauseBtn");
+const progressContainer = document.getElementById("progressContainer");
+const progressFilled = document.getElementById("progressFilled");
+const progressThumb = document.getElementById("progressThumb");
+const currentTimeEl = document.getElementById("currentTime");
+const durationEl = document.getElementById("duration");
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+const widescreenBtn = document.getElementById("widescreenBtn");
+const widescreenBtnPanel = document.getElementById("widescreenBtnPanel");
+const zoomBtn = document.getElementById("zoomBtn");
+const zoomBtnPanel = document.getElementById("zoomBtnPanel");
+const resetZoomBtn = document.getElementById("resetZoomBtn");
+const resetZoomBtnPanel = document.getElementById("resetZoomBtnPanel");
+
+// -------- 初始化Plyr播放器 --------
+function initPlayer() {
+    player = new Plyr('#player', {
+        controls: [],
+        hideControls: true,
+        seekTime: 10,
+        keyboard: { focused: true, global: true }
+    });
+    
+    setupCustomControls();
+    setupZoomControls();
+}
+
+// -------- 设置缩放控制 --------
+function setupZoomControls() {
+    // 鼠标滚轮缩放
+    videoContainer.addEventListener('wheel', handleZoom, { passive: false });
+    
+    // 鼠标拖拽平移
+    videoContainer.addEventListener('mousedown', startPan);
+    document.addEventListener('mousemove', handlePan);
+    document.addEventListener('mouseup', stopPan);
+    
+    // 重置缩放
+    resetZoomBtn.addEventListener('click', resetZoom);
+    resetZoomBtnPanel.addEventListener('click', resetZoom);
+    
+    // 缩放模式切换
+    zoomBtn.addEventListener('click', toggleZoomMode);
+    zoomBtnPanel.addEventListener('click', toggleZoomMode);
+}
+
+// -------- 缩放功能 --------
+function handleZoom(e) {
+    if (!isZoomMode) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = videoContainer.getBoundingClientRect();
+    
+    // 计算鼠标位置相对于视频容器的百分比
+    const mouseX = (e.clientX - rect.left) / rect.width;
+    const mouseY = (e.clientY - rect.top) / rect.height;
+    
+    const zoomIntensity = 0.2;
+    const wheel = e.deltaY < 0 ? 1 : -1;
+    const zoomFactor = 1 + wheel * zoomIntensity;
+    const newScale = Math.max(1, Math.min(5, zoomScale * zoomFactor));
+    
+    if (newScale !== zoomScale) {
+        // 计算缩放中心点
+        const scaleChange = newScale / zoomScale;
+        
+        // 更新偏移量以保持鼠标位置不变
+        zoomOffsetX = mouseX - (mouseX - zoomOffsetX) / scaleChange;
+        zoomOffsetY = mouseY - (mouseY - zoomOffsetY) / scaleChange;
+        
+        zoomScale = newScale;
+        applyZoomTransform();
+        updateZoomDisplay();
+        
+        console.log(`缩放: ${Math.round(zoomScale * 100)}%, 偏移: (${zoomOffsetX.toFixed(2)}, ${zoomOffsetY.toFixed(2)})`);
+    }
+}
+
+// -------- 拖拽平移功能 --------
+function startPan(e) {
+    if (!isZoomMode || zoomScale <= 1) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    isPanning = true;
+    startPanX = e.clientX;
+    startPanY = e.clientY;
+    startOffsetX = zoomOffsetX;
+    startOffsetY = zoomOffsetY;
+    
+    videoContainer.classList.add('zooming');
+    videoContainer.style.cursor = 'grabbing';
+}
+
+function handlePan(e) {
+    if (!isPanning) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = videoContainer.getBoundingClientRect();
+    const deltaX = e.clientX - startPanX;
+    const deltaY = e.clientY - startPanY;
+    
+    // 限制平移范围
+    const maxOffset = 0.5 * (zoomScale - 1) / zoomScale;
+    
+    zoomOffsetX = Math.max(-maxOffset, Math.min(maxOffset, startOffsetX - deltaX / (rect.width * zoomScale)));
+    zoomOffsetY = Math.max(-maxOffset, Math.min(maxOffset, startOffsetY - deltaY / (rect.height * zoomScale)));
+    
+    applyZoomTransform();
+}
+
+function stopPan() {
+    isPanning = false;
+    videoContainer.classList.remove('zooming');
+    if (isZoomMode) {
+        videoContainer.style.cursor = 'zoom-in';
+    } else {
+        videoContainer.style.cursor = '';
+    }
+}
+
+// -------- 应用缩放变换 --------
+function applyZoomTransform() {
+    // 强制设置视频尺寸，确保缩放生效
+    if (zoomScale > 1) {
+        videoElement.style.transform = `scale(${zoomScale}) translate(${zoomOffsetX * 100}%, ${zoomOffsetY * 100}%)`;
+        videoElement.style.maxWidth = 'none';
+        videoElement.style.maxHeight = 'none';
+        videoElement.style.width = 'auto';
+        videoElement.style.height = 'auto';
+    } else {
+        videoElement.style.transform = '';
+        videoElement.style.maxWidth = '';
+        videoElement.style.maxHeight = '';
+        videoElement.style.width = '';
+        videoElement.style.height = '';
+        zoomOffsetX = 0;
+        zoomOffsetY = 0;
+    }
+}
+
+// -------- 更新缩放显示 --------
+function updateZoomDisplay() {
+    const status = isZoomMode ? '开启' : '关闭';
+    const percentage = Math.round(zoomScale * 100);
+    zoomDisplay.textContent = `缩放: ${status} (${percentage}%)`;
+    
+    if (isZoomMode) {
+        zoomDisplay.classList.add('active');
+    } else {
+        zoomDisplay.classList.remove('active');
+    }
+}
+
+// -------- 重置缩放 --------
+function resetZoom() {
+    zoomScale = 1;
+    zoomOffsetX = 0;
+    zoomOffsetY = 0;
+    applyZoomTransform();
+    updateZoomDisplay();
+    console.log('缩放已重置');
+}
+
+// -------- 切换缩放模式 --------
+function toggleZoomMode() {
+    isZoomMode = !isZoomMode;
+    
+    if (isZoomMode) {
+        // 开启缩放模式
+        videoContainer.classList.add('zoomable');
+        zoomBtn.classList.add('active');
+        zoomBtnPanel.classList.add('active');
+        videoContainer.style.cursor = 'zoom-in';
+        console.log('缩放模式已开启');
+    } else {
+        // 关闭缩放模式
+        videoContainer.classList.remove('zoomable', 'zooming');
+        zoomBtn.classList.remove('active');
+        zoomBtnPanel.classList.remove('active');
+        videoContainer.style.cursor = '';
+        resetZoom();
+        console.log('缩放模式已关闭');
+    }
+    
+    updateZoomDisplay();
+}
+
+// -------- 设置自定义控制条 --------
+function setupCustomControls() {
+    playPauseBtn.addEventListener('click', () => {
+        if (player.paused) {
+            player.play();
+        } else {
+            player.pause();
+        }
+    });
+
+    progressContainer.addEventListener('click', (e) => {
+        if (player.duration) {
+            const rect = progressContainer.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            player.currentTime = percent * player.duration;
+        }
+    });
+
+    progressContainer.addEventListener('mousedown', startSeeking);
+    document.addEventListener('mousemove', seek);
+    document.addEventListener('mouseup', stopSeeking);
+
+    fullscreenBtn.addEventListener('click', () => {
+        if (player.fullscreen.active) {
+            player.fullscreen.exit();
+        } else {
+            player.fullscreen.enter();
+        }
+    });
+
+    widescreenBtn.addEventListener('click', toggleWidescreen);
+    widescreenBtnPanel.addEventListener('click', toggleWidescreen);
+
+    player.on('play', () => {
+        playPauseBtn.textContent = '❚❚';
+    });
+
+    player.on('pause', () => {
+        playPauseBtn.textContent = '▶';
+    });
+
+    player.on('timeupdate', updateProgress);
+    player.on('loadedmetadata', updateDuration);
+}
+
+// -------- 宽屏模式切换 --------
+function toggleWidescreen() {
+    isWidescreen = !isWidescreen;
+    
+    if (isWidescreen) {
+        videoContainer.classList.add('widescreen');
+        widescreenBtn.classList.add('active');
+        widescreenBtnPanel.classList.add('active');
+        widescreenDisplay.textContent = '宽屏: 开启';
+    } else {
+        videoContainer.classList.remove('widescreen');
+        widescreenBtn.classList.remove('active');
+        widescreenBtnPanel.classList.remove('active');
+        widescreenDisplay.textContent = '宽屏: 关闭';
+    }
+}
+
+// -------- 旋转功能 --------
+function rotateVideo() {
+    rotationDeg = (rotationDeg + 90) % 360;
+    
+    // 移除所有旋转类
+    videoContainer.classList.remove('rotated', 'rotated-90', 'rotated-180', 'rotated-270');
+    
+    if (rotationDeg > 0) {
+        videoContainer.classList.add('rotated', `rotated-${rotationDeg}`);
+    }
+    
+    rotationDisplay.textContent = `旋转: ${rotationDeg}°`;
+}
+
+// -------- 进度条拖拽功能 --------
+function startSeeking(e) {
+    isSeeking = true;
+    seek(e);
+}
+
+function seek(e) {
+    if (!isSeeking || !player.duration) return;
+    
+    const rect = progressContainer.getBoundingClientRect();
+    let percent = (e.clientX - rect.left) / rect.width;
+    percent = Math.max(0, Math.min(1, percent));
+    
+    player.currentTime = percent * player.duration;
+    updateProgress();
+}
+
+function stopSeeking() {
+    isSeeking = false;
+}
+
+// -------- 更新进度条显示 --------
+function updateProgress() {
+    if (!player.duration || isSeeking) return;
+    
+    const percent = (player.currentTime / player.duration) * 100;
+    progressFilled.style.width = percent + '%';
+    progressThumb.style.left = percent + '%';
+    
+    currentTimeEl.textContent = formatTime(player.currentTime);
+}
+
+function updateDuration() {
+    if (player.duration) {
+        durationEl.textContent = formatTime(player.duration);
+    }
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// -------- 设备加载 --------
+async function loadDevices() {
+    try {
+        const res = await fetch("/api/devices");
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const devices = await res.json();
+        const list = document.getElementById("devices");
+        list.innerHTML = "";
+        
+        if (devices.length === 0) {
+            const li = document.createElement("li");
+            li.textContent = "未找到设备";
+            li.style.color = "#999";
+            li.style.cursor = "default";
+            list.appendChild(li);
+            return;
+        }
+        
+        devices.forEach(d => {
+            const li = document.createElement("li");
+            li.textContent = d;
+            li.onclick = () => {
+                document.querySelectorAll('#devices li').forEach(item => {
+                    item.classList.remove('active');
+                });
+                li.classList.add('active');
+                loadVideos(d);
+            };
+            list.appendChild(li);
+        });
+    } catch (error) {
+        console.error("加载设备失败:", error);
+        const list = document.getElementById("devices");
+        list.innerHTML = "<li style='color:#ff6b6b;'>加载设备失败</li>";
+    }
+}
+
+// -------- 视频加载 --------
+async function loadVideos(device) {
+    currentDevice = device;
+    const date = document.getElementById("datePicker").value || new Date().toISOString().slice(0,10);
+    
+    try {
+        const res = await fetch(`/api/videos/${device}?date=${date}`);
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        videosData = await res.json();
+
+        videosData.forEach(v => {
+            if (!v.duration) {
+                v.duration = 60;
+            }
+        });
+
+        currentVideoIndex = 0;
+        if (videosData.length > 0) {
+            playVideo(videosData[0]);
+        } else {
+            player.source = null;
+            console.log("该日期下没有找到视频文件");
+        }
+        drawTimeline();
+    } catch (error) {
+        console.error("加载视频失败:", error);
+        videosData = [];
+        player.source = null;
+        drawTimeline();
+    }
+}
+
+// -------- 播放视频 --------
+function playVideo(v) {
+    player.source = {
+        type: 'video',
+        sources: [
+            {
+                src: v.url,
+                type: 'video/mp4'
+            }
+        ]
+    };
+    
+    player.play().catch(e => {
+        console.log("自动播放被阻止，用户需要手动点击播放");
+    });
+}
+
+// -------- 自动播放下一段 --------
+function setupPlayerEvents() {
+    player.on('ended', () => {
+        if (currentVideoIndex < videosData.length - 1) {
+            currentVideoIndex++;
+            playVideo(videosData[currentVideoIndex]);
+        }
+    });
+}
+
+// -------- 播放头控制 --------
+function updateVideoByPlayhead(x) {
+    const totalSeconds = 24 * 3600;
+    const seconds = (x / timeline.offsetWidth) * totalSeconds;
+    
+    for (let i = 0; i < videosData.length; i++) {
+        const v = videosData[i];
+        const start = v.start_sec;
+        const end = start + v.duration;
+        
+        if (seconds >= start && seconds < end) {
+            if (i !== currentVideoIndex) {
+                currentVideoIndex = i;
+                playVideo(v);
+            }
+            player.currentTime = seconds - start;
+            break;
+        }
+    }
+}
+
+// -------- 播放头动画 --------
+function animatePlayhead() {
+    if (!isDragging && videosData.length > 0 && currentVideoIndex < videosData.length) {
+        const v = videosData[currentVideoIndex];
+        if (v && player.duration > 0) {
+            const seconds = v.start_sec + player.currentTime;
+            const x = (seconds / (24 * 3600)) * timeline.offsetWidth;
+            playhead.style.left = x + "px";
+            
+            const timeStr = new Date(seconds * 1000).toISOString().substr(11, 8);
+            playheadLabel.textContent = timeStr;
+        }
+    }
+    requestAnimationFrame(animatePlayhead);
+}
+
+// -------- 绘制时间轴 --------
+function drawTimeline() {
+    timeline.innerHTML = "";
+    timeline.style.width = 24 * timelineScale + "px";
+    
+    for (let i = 0; i < 24; i++) {
+        const mark = document.createElement("div");
+        mark.className = "hourMark";
+        mark.style.left = (i * timelineScale) + "px";
+        mark.textContent = i.toString().padStart(2, "0") + ":00";
+        timeline.appendChild(mark);
+    }
+
+    videosData.forEach(v => {
+        const left = (v.start_sec / 3600) * timelineScale;
+        const width = Math.max((v.duration / 3600) * timelineScale, 2);
+        const div = document.createElement("div");
+        div.className = "timeblock";
+        div.style.left = left + "px";
+        div.style.width = width + "px";
+        div.title = `${v.name} (${new Date(v.start_sec * 1000).toISOString().substr(11, 8)})`;
+        div.onclick = () => {
+            currentVideoIndex = videosData.indexOf(v);
+            playVideo(v);
+        };
+        timeline.appendChild(div);
+    });
+}
+
+// -------- 时间轴缩放 --------
+timelineContainer.addEventListener("wheel", e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const containerWidth = timelineContainer.clientWidth;
+    const playheadX = parseFloat(playhead.style.left) || 0;
+    const ratio = playheadX / timeline.offsetWidth;
+
+    timelineScale += e.deltaY > 0 ? -10 : 10;
+    if (timelineScale < 20) timelineScale = 20;
+    if (timelineScale > 200) timelineScale = 200;
+
+    drawTimeline();
+    const newPlayheadX = ratio * timeline.offsetWidth;
+    timelineContainer.scrollLeft = newPlayheadX - containerWidth / 2;
+});
+
+// -------- 时间控制功能 --------
+function seekBackward(seconds) {
+    player.currentTime = Math.max(0, player.currentTime - seconds);
+}
+
+function seekForward(seconds) {
+    player.currentTime = Math.min(player.duration, player.currentTime + seconds);
+}
+
+// -------- 倍速播放功能 --------
+function setPlaybackSpeed(speed) {
+    player.speed = speed;
+    
+    document.querySelectorAll('button[data-speed]').forEach(btn => {
+        btn.classList.remove('active');
+        if (parseFloat(btn.dataset.speed) === speed) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// -------- 绑定事件 --------
+function bindControlEvents() {
+    document.getElementById("rotateBtn").onclick = rotateVideo;
+    document.getElementById("back5").onclick = () => seekBackward(5);
+    document.getElementById("back10").onclick = () => seekBackward(10);
+    
+    document.getElementById("rotateBtnPanel").onclick = rotateVideo;
+    document.getElementById("back5Panel").onclick = () => seekBackward(5);
+    document.getElementById("back10Panel").onclick = () => seekBackward(10);
+    
+    document.querySelectorAll("button[data-speed]").forEach(btn => {
+        btn.onclick = () => setPlaybackSpeed(parseFloat(btn.dataset.speed));
+    });
+}
+
+// -------- 下载 --------
+downloadBtn.onclick = () => {
+    if (videosData.length === 0) return;
+    const v = videosData[currentVideoIndex];
+    const a = document.createElement("a");
+    a.href = v.url;
+    a.download = v.name;
+    a.click();
+};
+
+// -------- 控制面板收起 --------
+togglePanel.onclick = () => {
+    const hidden = controlPanel.style.display === "none";
+    controlPanel.style.display = hidden ? "block" : "none";
+    togglePanel.style.display = hidden ? "none" : "block";
+};
+
+controlPanel.addEventListener("mouseleave", () => {
+    controlPanel.style.display = "none";
+    togglePanel.style.display = "block";
+});
+
+// -------- 初始化 --------
+document.getElementById("datePicker").value = new Date().toISOString().slice(0, 10);
+document.getElementById("datePicker").onchange = () => {
+    if (currentDevice) loadVideos(currentDevice);
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initPlayer();
+    setupPlayerEvents();
+    bindControlEvents();
+    loadDevices();
+    animatePlayhead();
+    updateZoomDisplay();
+});
+</script>
+</body>
+</html>
