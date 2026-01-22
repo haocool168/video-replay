@@ -1,1 +1,21 @@
 #监控回放系统
+
+services:
+  video-replay:
+    image: 192.168.31.49:86/video-replay:25.10.07.1
+    container_name: video-replay
+    restart: unless-stopped
+    ports:
+      - "8383:8383"
+    volumes:
+      # 挂载视频存储路径
+      - /mnt/sde1/videos/QVNtmVqwHI:/mnt/sdb1/jiankang
+      # 如果你想挂载日志目录，可以取消下一行注释
+      # - ./logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+    # 可选：限制资源使用
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 512M
